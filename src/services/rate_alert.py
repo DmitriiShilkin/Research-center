@@ -1,6 +1,5 @@
 import asyncio
 import datetime
-import pprint
 from datetime import UTC
 
 import aiohttp
@@ -183,11 +182,6 @@ async def retry_task(task_func, max_retries=3):
 
 async def main():
     try:
-        # task1 = asyncio.create_task(get_binance_data())
-        # task2 = asyncio.create_task(get_coinmarketcap_data())
-        # task3 = asyncio.create_task(get_bybit_data())
-        # task4 = asyncio.create_task(get_gate_data())
-        # task5 = asyncio.create_task(get_kucoin_data())
         tasks = await asyncio.gather(
             retry_task(get_binance_data()),
             retry_task(get_coinmarketcap_data()),
@@ -197,7 +191,6 @@ async def main():
         )
     except Exception as e:
         print(f'Exception: {e}')
-    # return task1.result(), task2.result(), task3.result(), task4.result(), task5.result()
     return tuple(tasks)
 
 
@@ -255,4 +248,3 @@ async def get_final_data():
         }
     }
     return final_data
-
