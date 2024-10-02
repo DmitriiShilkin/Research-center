@@ -34,6 +34,10 @@ class RateAlertCreate(RateAlertBase):
     ...
 
 
+class RateAlertUpdate(RateAlertBase):
+    ...
+
+
 class RateAlertResponse(RateAlertBase):
     id: PositiveInt
     created_at: datetime

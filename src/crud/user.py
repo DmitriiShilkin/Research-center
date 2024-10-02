@@ -1,8 +1,7 @@
 import uuid
-from typing import Optional, Union
+from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel
 
 from crud.async_crud import BaseAsyncCRUD
 from models import User
@@ -30,7 +29,7 @@ class CRUDUser(BaseAsyncCRUD[User, UserCreate, UserUpdateDB]):
             random_uid = str(uuid.uuid4())
             user_created = await User.create(
                 uid=random_uid,
-                username=random_uid,
+                username=create_data.get("email").split('@')[0],
                 hashed_password=hashed_password,
                 **create_data,
             )
@@ -38,19 +37,6 @@ class CRUDUser(BaseAsyncCRUD[User, UserCreate, UserUpdateDB]):
             raise
 
         return user_created
-
-    async def update(
-        self,
-        *,
-        db_obj: User,
-        update_data: Union[UserUpdateDB, dict],
-    ) -> User:
-        if isinstance(update_data, BaseModel):
-            update_data = update_data.model_dump(exclude_unset=True)
-
-        await self.model.filter(id=db_obj.id).update(**update_data)
-
-        return await self.model.get(id=db_obj.id)
 
 
 crud_user = CRUDUser(User)

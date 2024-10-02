@@ -13,7 +13,7 @@ class UpdateAsync(Generic[ModelType, UpdateSchemaType]):
         update_data: Union[UpdateSchemaType, dict],
     ) -> ModelType:
         if isinstance(update_data, BaseModel):
-            update_data = update_data.dump(exclude_unset=True)
+            update_data = update_data.model_dump(exclude_unset=True, mode="json")
         await self.model.filter(id=db_obj.id).update(**update_data)
 
         return await self.model.get(id=db_obj.id)
