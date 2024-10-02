@@ -1,0 +1,53 @@
+BTC_AMOUNT = 3
+
+INITIAL_RATES = {
+    'BTCDOGE': 598802.3952095808,
+    'BTCETH': 24.832381425378692,
+    'BTCRUB': 5800600.0067654215,
+    'BTCSOL': 421.5140785702242,
+    'BTCUSDT': 63430.0,
+    'BTCXMR': 437.25404459991256
+}
+
+COINS = [
+    {'BTC': 'USDT'},
+    {'BTC': 'ETH'},
+    {'BTC': 'XMR'},
+    {'BTC': 'SOL'},
+    {'BTC': 'RUB'},
+    {'BTC': 'DOGE'},
+]
+
+BINANCE_SYMBOLS_LIST = [
+    'BTCUSDT',
+    'ETHBTC',
+    'XMRBTC',
+    'SOLBTC',
+    'BTCRUB',
+    'DOGEBTC',
+]
+
+BYBIT_SYMBOLS_LIST = [
+    'BTCUSDT',
+    'ETHBTC',
+    'SOLBTC',
+    'RUBYUSDT',
+    'DOGEUSDT',
+]
+
+GATE_SYMBOLS_LIST = [
+    'BTCUSDT',
+    'ETHBTC',
+    'XMRBTC',
+    'SOLUSDT',
+    'RUBYUSDT',
+    'DOGEBTC',
+]
+
+KUCOIN_SYMBOLS_LIST = [
+    'BTCUSDT',
+    'ETHBTC',
+    'XMRBTC',
+    'SOLUSDT',
+    'DOGEBTC',
+]
