@@ -1,5 +1,6 @@
-from configs.config import db_settings
+from tortoise import Tortoise
 
+from configs.config import db_settings
 
 # Конфигурация базы данных
 DB_URL = (
@@ -23,3 +24,16 @@ TORTOISE_ORM = {
         },
     },
 }
+
+
+# Инициализация подключения к базе данных
+async def init_db():
+    await Tortoise.init(
+        db_url=DB_URL,
+        modules={"models": MODELS}  # путь до моделей
+    )
+
+
+# Закрытие подключения при завершении работы приложения
+async def close_db():
+    await Tortoise.close_connections()

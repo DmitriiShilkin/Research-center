@@ -1,33 +1,25 @@
 from contextlib import asynccontextmanager
+import schedule
 import uvicorn
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
-from tortoise import Tortoise
 
 from api.v1.router import router as v1_router
 from configs.config import app_settings
-from configs.db import DB_URL, MODELS
 from constants.backend import BACKEND_ENTRYPOINT
-
-
-# Инициализация подключения к базе данных
-async def init_db():
-    await Tortoise.init(
-        db_url=DB_URL,
-        modules={"models": MODELS}  # путь до моделей
-    )
-
-
-# Закрытие подключения при завершении работы приложения
-async def close_db():
-    await Tortoise.close_connections()
+from services.rate_alert import get_final_data
+from services.scheduler import run_continuously, schedule_task
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_db()
+    # Запуск фоновой задачи для schedule каждый час
+    schedule.every().hour.do(schedule_task, get_final_data)
+    # запуск фоновой задачи в отдельном потоке
+    stop_run_continuously = run_continuously()
     yield
-    await close_db()
+    # остановка фоновой задачи
+    stop_run_continuously.set()
 
 
 app = FastAPI(

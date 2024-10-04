@@ -1,6 +1,7 @@
 from typing import Generic, Optional, Sequence
 
 from constants.crud_types import ModelType
+from configs.db import close_db, init_db
 
 
 class ReadAsync(Generic[ModelType]):
@@ -16,4 +17,8 @@ class ReadAsync(Generic[ModelType]):
         skip: int = 0,
         limit: int = 100,
     ) -> Sequence[ModelType]:
-        return await self.model.all().offset(skip).limit(limit)
+        await init_db()
+        obj = await self.model.all().offset(skip).limit(limit)
+        await close_db()
+
+        return obj

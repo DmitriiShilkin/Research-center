@@ -2,7 +2,7 @@ import uuid
 from typing import Optional
 from uuid import UUID
 
-
+from configs.db import close_db, init_db
 from crud.async_crud import BaseAsyncCRUD
 from models import User
 from schemas.user import UserCreate, UserUpdateDB
@@ -16,13 +16,18 @@ class CRUDUser(BaseAsyncCRUD[User, UserCreate, UserUpdateDB]):
     async def get_by_email(
         self, email: str
     ) -> Optional[User]:
-        return await self.model.filter(email=email).first()
+        await init_db()
+        obj = await self.model.filter(email=email).first()
+        await close_db()
+
+        return obj
 
     async def create(
         self,
         *,
         create_data: UserCreate,
     ) -> User:
+        await init_db()
         try:
             create_data = create_data.model_dump(exclude_unset=True)
             hashed_password = await hash_password(create_data.pop("password"))
@@ -35,6 +40,7 @@ class CRUDUser(BaseAsyncCRUD[User, UserCreate, UserUpdateDB]):
             )
         except Exception:
             raise
+        await close_db()
 
         return user_created
 

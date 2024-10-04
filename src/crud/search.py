@@ -1,6 +1,7 @@
 from typing import List
 
 from models import RateAlert
+from configs.db import close_db, init_db
 
 
 class CRUDSearch:
@@ -24,10 +25,13 @@ class CRUDSearch:
         skip: int,
         limit: int,
     ) -> List[RateAlert]:
+        await init_db()
         query_filter = " OR ".join([f"key_json->>'title' ILIKE '%{q}%'" for q in query.split()])
         query = f"SELECT * FROM ratealert WHERE {query_filter} ORDER BY id LIMIT {limit} OFFSET {skip}"
+        result = await RateAlert.raw(query)
+        await close_db()
 
-        return await RateAlert.raw(query)
+        return result
 
 
 crud_search = CRUDSearch()

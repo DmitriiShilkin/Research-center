@@ -1,7 +1,7 @@
 import asyncio
 import datetime
 from datetime import UTC
-
+from typing import Dict, Coroutine, Tuple
 import aiohttp
 
 from constants.rate_alert import (
@@ -15,9 +15,11 @@ from constants.rate_alert import (
 )
 
 from configs.config import crypto_api_settings
+from crud.rate_alert import crud_rate_alert
+from schemas.rate_alert import RateAlertCreate
 
 
-async def get_initial_data():
+async def get_initial_data() -> Dict:
     result = {}
     async with aiohttp.ClientSession() as session:
         # команда для отправки запроса к API
@@ -42,7 +44,7 @@ async def get_initial_data():
     return result
 
 
-async def get_binance_data():
+async def get_binance_data() -> Dict:
     result = {}
     async with aiohttp.ClientSession() as session:
         # команда для отправки запроса к API
@@ -63,7 +65,7 @@ async def get_binance_data():
     return result
 
 
-async def get_coinmarketcap_data():
+async def get_coinmarketcap_data() -> Dict:
     result = {}
     async with aiohttp.ClientSession() as session:
         # команда для отправки запроса к API
@@ -97,7 +99,7 @@ async def get_coinmarketcap_data():
     return result
 
 
-async def get_bybit_data():
+async def get_bybit_data() -> Dict:
     result = {}
     async with aiohttp.ClientSession() as session:
         # команда для отправки запроса к API
@@ -122,7 +124,7 @@ async def get_bybit_data():
     return result
 
 
-async def get_gate_data():
+async def get_gate_data() -> Dict:
     result = {}
     async with aiohttp.ClientSession() as session:
         # команда для отправки запроса к API
@@ -147,7 +149,7 @@ async def get_gate_data():
     return result
 
 
-async def get_kucoin_data():
+async def get_kucoin_data() -> Dict:
     result = {}
     async with aiohttp.ClientSession() as session:
         # команда для отправки запроса к API
@@ -170,7 +172,7 @@ async def get_kucoin_data():
     return result
 
 
-async def retry_task(task_func, max_retries=3):
+async def retry_task(task_func, max_retries=3) -> Coroutine:
     for attempt in range(max_retries):
         try:
             result = await asyncio.create_task(task_func)
@@ -180,7 +182,8 @@ async def retry_task(task_func, max_retries=3):
             await asyncio.sleep(1)
 
 
-async def main():
+async def main() -> Tuple:
+    tasks = {}
     try:
         tasks = await asyncio.gather(
             retry_task(get_binance_data()),
@@ -194,57 +197,83 @@ async def main():
     return tuple(tasks)
 
 
-async def get_new_data():
+async def get_new_data() -> Dict:
     new_data = {}
     binance_data, cmc_data, bybit_data, gate_data, kucoin_data = await main()
-    data = binance_data
-    data.update(cmc_data)
-    data.update(bybit_data)
-    data.update(gate_data)
-    data.update(kucoin_data)
-    for key, value in data.items():
-        pair = key.split('-')[1]
-        rate = value / INITIAL_RATES[pair]
-        if rate >= 1.0003:
-            new_data[key] = {
-                'price': value,
-                'rate': rate,
-                'date': datetime.datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-            }
+    data = {}
+    if binance_data:
+        data.update(binance_data)
+    if cmc_data:
+        data.update(cmc_data)
+    if bybit_data:
+        data.update(bybit_data)
+    if gate_data:
+        data.update(gate_data)
+    if kucoin_data:
+        data.update(kucoin_data)
+
+    if data:
+        for key, value in data.items():
+            pair = key.split('-')[1]
+            rate = value / INITIAL_RATES[pair]
+            if rate >= 1.0003:
+                new_data[key] = {
+                    'price': value,
+                    'rate': rate,
+                    'date': datetime.datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+                }
     return new_data
 
 
-async def get_final_data():
+async def get_final_data() -> Dict:
     new_data = await get_new_data()
-    max_rate_pair = max(new_data, key=lambda x: new_data[x]['rate'])
-    max_rate = new_data[max_rate_pair]['rate']
-    currency_pair = max_rate_pair.split('-')[1]
-    min_rate_pair = None
-    min_rate = float('inf')
-    for pair, info in new_data.items():
-        if currency_pair in pair:
-            if info['rate'] < min_rate:
-                min_rate = info['rate']
-                min_rate_pair = pair
+    final_data = {}
+    if new_data:
+        max_rate_pair = max(new_data, key=lambda x: new_data[x]['rate'])
+        max_rate = new_data[max_rate_pair]['rate']
+        currency_pair = max_rate_pair.split('-')[1]
+        min_rate_pair = None
+        min_rate = float('inf')
+        for pair, info in new_data.items():
+            if currency_pair in pair:
+                if info['rate'] < min_rate:
+                    min_rate = info['rate']
+                    min_rate_pair = pair
 
-    final_data = {
-        'key_json':  {
-            'title': f'{currency_pair[:3]}/{currency_pair[3:]} Rate Alert',
-            'kash': [
-                {
-                    'price': round(INITIAL_RATES[currency_pair], 2),
-                    'minmax': [
-                        {
-                            'min_price': round(new_data[min_rate_pair]['price'], 2),
-                            'max_price': round(new_data[max_rate_pair]['price'], 2),
-                        }
-                    ],
-                }
-            ],
-            'difference': round(((max_rate - 1) * 100), 2),
-            'total_amount': round(BTC_AMOUNT * new_data[max_rate_pair]['price'], 2),
-            'coins': COINS,
-            'date': new_data[max_rate_pair]['date']
+        final_data = {
+            'key_json':  {
+                'title': f'{currency_pair[:3]}/{currency_pair[3:]} Rate Alert',
+                'kash': [
+                    {
+                        'price': round(INITIAL_RATES[currency_pair], 2),
+                        'minmax': [
+                            {
+                                'min_price': round(new_data[min_rate_pair]['price'], 2),
+                                'max_price': round(new_data[max_rate_pair]['price'], 2),
+                            }
+                        ],
+                    }
+                ],
+                'difference': round(((max_rate - 1) * 100), 2),
+                'total_amount': round(BTC_AMOUNT * new_data[max_rate_pair]['price'], 2),
+                'coins': COINS,
+                'date': new_data[max_rate_pair]['date']
+            }
         }
-    }
+    if final_data:
+        await create_rate_alert()
+
     return final_data
+
+
+async def create_rate_alert():
+    create_data = await get_final_data()
+    try:
+        schema = RateAlertCreate(
+            **create_data,
+        )
+        await crud_rate_alert.create(
+            create_schema=schema
+        )
+    except ValueError:
+        raise
