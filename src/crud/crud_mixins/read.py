@@ -9,7 +9,11 @@ class ReadAsync(Generic[ModelType]):
         self,
         obj_id: int,
     ) -> Optional[ModelType]:
-        return await self.model.filter(id=obj_id).first()
+        await init_db()
+        obj = await self.model.filter(id=obj_id).first()
+        await close_db()
+
+        return obj
 
     async def get_multi(
         self,
@@ -18,7 +22,7 @@ class ReadAsync(Generic[ModelType]):
         limit: int = 100,
     ) -> Sequence[ModelType]:
         await init_db()
-        obj = await self.model.all().offset(skip).limit(limit)
+        objs = await self.model.all().offset(skip).limit(limit)
         await close_db()
 
-        return obj
+        return objs

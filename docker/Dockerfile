@@ -10,6 +10,10 @@ ENV PYTHONUNBUFFERED 1
 # install psycopg2 dependencies
 RUN apk update && apk add postgresql-dev gcc python3-dev musl-dev g++ libffi-dev cairo-dev
 
+# install mailcatcher
+RUN apt-get install -y build-essential libsqlite3-dev ruby1.9.3
+RUN gem install mailcatcher
+
 #########
 # FINAL #
 #########

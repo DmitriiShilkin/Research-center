@@ -44,6 +44,18 @@ class DBSettings(BaseSetting):
     POSTGRES_PASSWORD: str
 
 
+class MailSettings(BaseSetting):
+    MAIL_USERNAME: str
+    MAIL_PASSWORD: str
+    MAIL_FROM: str
+    MAIL_PORT: int = 587
+    MAIL_SERVER: str
+    MAIL_STARTTLS: bool = True
+    MAIL_SSL_TLS: bool = False
+    USE_CREDENTIALS: bool = True
+    VALIDATE_CERTS: bool = True
+
+
 class JWTSettings(BaseSetting):
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str
@@ -61,5 +73,6 @@ class CryptoAPISettings(BaseSetting):
 
 app_settings = AppSettings()
 db_settings = DBSettings()
+mail_settings = MailSettings()
 jwt_settings = JWTSettings()
 crypto_api_settings = CryptoAPISettings()

@@ -11,12 +11,14 @@ from constants.rate_alert import (
     KUCOIN_SYMBOLS_LIST,
     BTC_AMOUNT,
     COINS,
-    INITIAL_RATES,
 )
-
 from configs.config import crypto_api_settings
+from constants.email_contexts import USER_EMAIL
+from crud.initial_rate import crud_initial_rate
 from crud.rate_alert import crud_rate_alert
 from schemas.rate_alert import RateAlertCreate
+from services.email import send_new_rate_alert_email
+from services.initial_rate import create_initial_rate, update_initial_rate
 
 
 async def get_initial_data() -> Dict:
@@ -183,24 +185,36 @@ async def retry_task(task_func, max_retries=3) -> Coroutine:
 
 
 async def main() -> Tuple:
-    tasks = {}
-    try:
-        tasks = await asyncio.gather(
-            retry_task(get_binance_data()),
-            retry_task(get_coinmarketcap_data()),
-            retry_task(get_bybit_data()),
-            retry_task(get_gate_data()),
-            retry_task(get_kucoin_data())
-        )
-    except Exception as e:
-        print(f'Exception: {e}')
+    tasks = await asyncio.gather(
+        retry_task(get_binance_data()),
+        retry_task(get_coinmarketcap_data()),
+        retry_task(get_bybit_data()),
+        retry_task(get_gate_data()),
+        retry_task(get_kucoin_data())
+    )
     return tuple(tasks)
 
 
-async def get_new_data() -> Dict:
+async def get_new_data() -> Tuple:
     new_data = {}
-    binance_data, cmc_data, bybit_data, gate_data, kucoin_data = await main()
     data = {}
+    initial_rates = {}
+    initial_data = await crud_initial_rate.get_multi()
+    if initial_data:
+        initial_rates = {item.name: item.value for item in initial_data}
+    else:
+        try:
+            initial_rates = await retry_task(get_initial_data())
+        except Exception as e:
+            print(f'Exception: {e}')
+
+        for key, value in initial_rates.items():
+            await create_initial_rate({
+                'name': key,
+                'value': round(value, 2)
+            })
+
+    binance_data, cmc_data, bybit_data, gate_data, kucoin_data = await main()
     if binance_data:
         data.update(binance_data)
     if cmc_data:
@@ -215,37 +229,40 @@ async def get_new_data() -> Dict:
     if data:
         for key, value in data.items():
             pair = key.split('-')[1]
-            rate = value / INITIAL_RATES[pair]
+            rate = value / initial_rates[pair]
             if rate >= 1.0003:
                 new_data[key] = {
                     'price': value,
                     'rate': rate,
                     'date': datetime.datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
                 }
-    return new_data
+                await update_initial_rate(pair, value)
+
+    return new_data, initial_rates
 
 
-async def get_final_data() -> Dict:
-    new_data = await get_new_data()
+async def get_final_data() -> None:
+    new_data, initial_rates = await get_new_data()
     final_data = {}
+    currency_pair = ''
+    market_name = ''
     if new_data:
         max_rate_pair = max(new_data, key=lambda x: new_data[x]['rate'])
         max_rate = new_data[max_rate_pair]['rate']
-        currency_pair = max_rate_pair.split('-')[1]
-        min_rate_pair = None
+        market_name, currency_pair = max_rate_pair.split('-')
+        min_rate_pair = ''
         min_rate = float('inf')
         for pair, info in new_data.items():
             if currency_pair in pair:
                 if info['rate'] < min_rate:
                     min_rate = info['rate']
                     min_rate_pair = pair
-
         final_data = {
             'key_json':  {
                 'title': f'{currency_pair[:3]}/{currency_pair[3:]} Rate Alert',
                 'kash': [
                     {
-                        'price': round(INITIAL_RATES[currency_pair], 2),
+                        'price': initial_rates[currency_pair],
                         'minmax': [
                             {
                                 'min_price': round(new_data[min_rate_pair]['price'], 2),
@@ -261,13 +278,16 @@ async def get_final_data() -> Dict:
             }
         }
     if final_data:
-        await create_rate_alert()
+        await create_rate_alert(final_data)
+        await send_new_rate_alert_email(
+            to_email=USER_EMAIL,
+            market_name=market_name,
+            total_amount=f"{final_data.get('key_json').get('total_amount')} {currency_pair[3:]}",
+            difference=f"+{final_data.get('key_json').get('difference')}%",
+        )
 
-    return final_data
 
-
-async def create_rate_alert():
-    create_data = await get_final_data()
+async def create_rate_alert(create_data: Dict) -> None:
     try:
         schema = RateAlertCreate(
             **create_data,

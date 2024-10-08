@@ -30,6 +30,25 @@ services:
       db:
         condition: service_healthy
 
+  mailcatcher:
+    image: schickling/mailcatcher
+    container_name: mailcatcher
+    hostname: mailcatcher
+    restart: unless-stopped
+    expose:
+      - 1025
+      - 1080
+    ports:
+      - 1025:1025
+      - 1080:1080
+    networks:
+      - home
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: 5
+
   db:
     image: postgres:12.16-alpine3.18
     hostname: rc-db

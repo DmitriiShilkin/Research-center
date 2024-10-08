@@ -11,11 +11,13 @@ from security.password import hash_password
 
 class CRUDUser(BaseAsyncCRUD[User, UserCreate, UserUpdateDB]):
     async def get_by_uid(self, uid: UUID) -> Optional[User]:
-        return await self.model.filter(uid=uid).first()
+        await init_db()
+        obj = await self.model.filter(uid=uid).first()
+        await close_db()
 
-    async def get_by_email(
-        self, email: str
-    ) -> Optional[User]:
+        return obj
+
+    async def get_by_email(self, email: str) -> Optional[User]:
         await init_db()
         obj = await self.model.filter(email=email).first()
         await close_db()

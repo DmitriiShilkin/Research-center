@@ -7,6 +7,8 @@ from starlette.middleware.cors import CORSMiddleware
 from api.v1.router import router as v1_router
 from configs.config import app_settings
 from constants.backend import BACKEND_ENTRYPOINT
+
+from constants.scheduler import RUN_INTERVAL_MINUTES
 from services.rate_alert import get_final_data
 from services.scheduler import run_continuously, schedule_task
 
@@ -14,7 +16,7 @@ from services.scheduler import run_continuously, schedule_task
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Запуск фоновой задачи для schedule каждый час
-    schedule.every().hour.do(schedule_task, get_final_data)
+    schedule.every(RUN_INTERVAL_MINUTES).minutes.do(schedule_task, get_final_data)
     # запуск фоновой задачи в отдельном потоке
     stop_run_continuously = run_continuously()
     yield
