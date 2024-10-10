@@ -1,17 +1,12 @@
-from decimal import Decimal
-from typing import Annotated, Optional
+from typing import Optional
+from pydantic import BaseModel
 
-from pydantic import BaseModel, PlainSerializer
+from constants.custom_types import DecimalJsonType
 
 
 class InitialRateBase(BaseModel):
     name: str
-    value: Annotated[
-        Decimal,
-        PlainSerializer(
-            lambda x: float(x), return_type=float, when_used='json'
-        ),
-    ]
+    value: DecimalJsonType
 
 
 class InitialRateCreate(InitialRateBase):
