@@ -1,0 +1,116 @@
+version: "3.9"
+
+services:
+  rc-core:
+    user: app:app
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: rc-core
+    hostname: rc-core
+    restart: unless-stopped
+    env_file:
+      - ../src/.env
+    command: >
+      sh -c "aerich upgrade &&
+             python src/main.py"
+    networks:
+      - home
+    ports:
+      - 127.0.0.1:8000:8000
+    expose:
+      - 8000
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: 5
+    depends_on:
+      - selenium-hub
+      db:
+        condition: service_healthy
+
+  mailcatcher:
+    image: schickling/mailcatcher
+    container_name: mailcatcher
+    hostname: mailcatcher
+    restart: unless-stopped
+    expose:
+      - 1025
+      - 1080
+    ports:
+      - 1025:1025
+      - 1080:1080
+    networks:
+      - home
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: 5
+
+  db:
+    image: postgres:12.16-alpine3.18
+    hostname: rc-db
+    container_name: rc-db
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:5432:5432
+    expose:
+      - 5432
+    env_file:
+      - ../src/.env
+    environment:
+      PGDATA: /var/lib/postgresql/data/rc/pgdata/
+      POSTGRES_DB: db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+    volumes:
+      - apgdata:/var/lib/postgresql/data/rc/pgdata/
+    networks:
+      - home
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d db"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+
+  selenium-hub:
+    image: selenium/hub:4.0.0
+    container_name: selenium-hub
+    ports:
+      - 4444:4444
+    expose:
+      - 4444
+    networks:
+      - home
+    environment:
+      GRID_MAX_SESSION: 5
+      GRID_BROWSER_TIMEOUT: 300000
+      GRID_TIMEOUT: 300000
+
+  chrome-node:
+    image: selenium/node-chrome:4.0.0
+    container_name: selenium-node-chrome
+    depends_on:
+      - selenium-hub
+    expose:
+      - 5555
+    environment:
+      - SE_EVENT_BUS_HOST=selenium-hub
+      - SE_EVENT_BUS_PORT=4442
+      - SE_NODE_MAX_SESSIONS=5
+      - SE_NODE_SESSION_TIMEOUT=300
+    networks:
+      - home
+
+networks:
+  home: {}
+
+volumes:
+  apgdata: {}
