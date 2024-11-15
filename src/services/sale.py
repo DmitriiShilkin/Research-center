@@ -20,10 +20,7 @@ from constants.sale import (
 clicked_once = False
 
 # Настройка WebDriver для работы с браузером (например, Chrome)
-options = webdriver.ChromeOptions()
-# Включает режим без открывания окна браузера
-options.add_argument('--headless')
-driver = webdriver.Chrome(options=options)
+driver = webdriver.Chrome()
 
 
 async def keyword_check(keyword: str) -> str:
@@ -40,6 +37,7 @@ async def get_wildberries_data(url: str, keyword: str) -> Tuple:
     keyword = await keyword_check(keyword)
     # Перейти на сайт и выполнить поиск
     driver.get(url)
+    driver.minimize_window()
     search_box = WebDriverWait(driver, WEB_DRIVER_WAIT_MAX_TIMEOUT).until(
         EC.presence_of_element_located((By.ID, 'searchInput'))
     )
@@ -55,6 +53,8 @@ async def get_wildberries_data(url: str, keyword: str) -> Tuple:
     products = soup.select('.product-card')
     min_price = float('inf')
     min_product = None
+    title = None
+    link = None
 
     for product in products:
         # селектор для цены товара
@@ -65,10 +65,11 @@ async def get_wildberries_data(url: str, keyword: str) -> Tuple:
             min_price = price
             min_product = product
 
-    # селектор для заголовка товара
-    title = min_product.select_one('a').get('aria-label')
-    # селектор для ссылки на товар
-    link = min_product.select_one('a').get('href')
+    if min_product:
+        # селектор для заголовка товара
+        title = min_product.select_one('a').get('aria-label')
+        # селектор для ссылки на товар
+        link = min_product.select_one('a').get('href')
 
     return title, min_price, link
 
@@ -78,6 +79,7 @@ async def get_ozon_data(url: str, keyword: str) -> Tuple:
     keyword = await keyword_check(keyword)
     # Перейти на сайт и выполнить поиск
     driver.get(url)
+    driver.minimize_window()
     if not clicked_once:
         refresh_button = WebDriverWait(driver, WEB_DRIVER_WAIT_MAX_TIMEOUT).until(
             EC.element_to_be_clickable((By.ID, "reload-button"))
@@ -112,6 +114,7 @@ async def get_ozon_data(url: str, keyword: str) -> Tuple:
     title = None
     price_index = None
     title_index = None
+    link = None
 
     for product in products:
         for i in range(len(product[1])):
@@ -129,8 +132,9 @@ async def get_ozon_data(url: str, keyword: str) -> Tuple:
             # селектор для заголовка товара
             title = min_product[1][title_index]['atom']['textAtom']['text']
 
-    # селектор для ссылки на товар
-    link = f"{url}{min_product[0].split('?')[0]}"
+    if min_product:
+        # селектор для ссылки на товар
+        link = f"{url}{min_product[0].split('?')[0]}"
 
     return title, min_price, link
 
@@ -139,6 +143,7 @@ async def get_yandex_data(url: str, keyword: str) -> Tuple:
     keyword = await keyword_check(keyword)
     # Перейти на сайт и выполнить поиск
     driver.get(url)
+    driver.minimize_window()
     search_box = WebDriverWait(driver, WEB_DRIVER_WAIT_MAX_TIMEOUT).until(
         EC.presence_of_element_located((By.ID, 'header-search'))
     )
@@ -192,8 +197,9 @@ async def get_yandex_data(url: str, keyword: str) -> Tuple:
             min_price = price
             min_product = product
 
-    title = min_product[1]
-    link = f"{url}{min_product[2].split('?')[0]}"
+    if min_product:
+        title = min_product[1]
+        link = f"{url}{min_product[2].split('?')[0]}"
 
     return title, min_price, link
 
@@ -220,22 +226,19 @@ async def check_prices() -> Dict:
 
     for site, url in URLS.items():
         for keyword in KEY_WORDS:
-            if site == 'wildberries':
-                title, price, link = await get_wildberries_data(url, keyword)
+            try:
+                if site == 'wildberries':
+                    title, price, link = await get_wildberries_data(url, keyword)
 
-            if site == 'ozon':
-                title, price, link = await get_ozon_data(url, keyword)
+                if site == 'ozon':
+                    title, price, link = await get_ozon_data(url, keyword)
 
-            if site == 'yandex':
-                title, price, link = await get_yandex_data(url, keyword)
-
-            result.update({
-                f'{site}-{keyword}': {
-                    'title': title,
-                    'price': price,
-                    'link': link
-                }
-            })
+                if site == 'yandex':
+                    title, price, link = await get_yandex_data(url, keyword)
+            except AttributeError:
+                print(f"Ошибка: не удалось получить данные для {keyword} на {site.title()}.")
+            
+            result[f"{site}-{keyword}"] = {'title': title, 'price': price, 'link': link}
 
     min_price_products = await find_min_price_products(result)
 

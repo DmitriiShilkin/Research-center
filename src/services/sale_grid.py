@@ -27,8 +27,6 @@ def get_remote_driver():
     # Для Chrome используем ChromeOptions; для Firefox использовать FirefoxOptions
     options = webdriver.ChromeOptions()
     # Добавляем аргументы для улучшения производительности
-    # использовать безоконный режим
-    options.add_argument('--headless')
     # не использовать песочницу
     options.add_argument('--no-sandbox')
     # не использовать /dev/shm для хранения временных файлов и использовать /tmp вместо этого
@@ -51,13 +49,13 @@ async def get_wildberries_data(driver: WebDriver, url: str, keyword: str) -> Tup
     keyword = await keyword_check(keyword)
     # Перейти на сайт и выполнить поиск
     driver.get(url)
+    driver.minimize_window()
     search_box = WebDriverWait(driver, WEB_DRIVER_WAIT_MAX_TIMEOUT).until(
         EC.presence_of_element_located((By.ID, 'searchInput'))
     )
     await asyncio.sleep(KEYWORD_SEND_TIMEOUT)
     search_box.send_keys(keyword)
     search_box.send_keys(Keys.RETURN)
-    # Ждем загрузки страницы
     await asyncio.sleep(PAGE_LOAD_WAIT_MAX_TIMEOUT)
 
     # Парсинг страницы с BeautifulSoup
@@ -66,6 +64,8 @@ async def get_wildberries_data(driver: WebDriver, url: str, keyword: str) -> Tup
     products = soup.select('.product-card')
     min_price = float('inf')
     min_product = None
+    title = None
+    link = None
 
     for product in products:
         # селектор для цены товара
@@ -76,10 +76,11 @@ async def get_wildberries_data(driver: WebDriver, url: str, keyword: str) -> Tup
             min_price = price
             min_product = product
 
-    # селектор для заголовка товара
-    title = min_product.select_one('a').get('aria-label')
-    # селектор для ссылки на товар
-    link = min_product.select_one('a').get('href')
+    if min_product:
+        # селектор для заголовка товара
+        title = min_product.select_one('a').get('aria-label')
+        # селектор для ссылки на товар
+        link = min_product.select_one('a').get('href')
 
     return title, min_price, link
 
@@ -89,6 +90,7 @@ async def get_ozon_data(driver: WebDriver, url: str, keyword: str) -> Tuple:
     keyword = await keyword_check(keyword)
     # Перейти на сайт и выполнить поиск
     driver.get(url)
+    driver.minimize_window()
     if not clicked_once:
         refresh_button = WebDriverWait(driver, WEB_DRIVER_WAIT_MAX_TIMEOUT).until(
             EC.element_to_be_clickable((By.ID, "reload-button"))
@@ -123,6 +125,7 @@ async def get_ozon_data(driver: WebDriver, url: str, keyword: str) -> Tuple:
     title = None
     price_index = None
     title_index = None
+    link = None
 
     for product in products:
         for i in range(len(product[1])):
@@ -140,8 +143,9 @@ async def get_ozon_data(driver: WebDriver, url: str, keyword: str) -> Tuple:
             # селектор для заголовка товара
             title = min_product[1][title_index]['atom']['textAtom']['text']
 
-    # селектор для ссылки на товар
-    link = f"{url}{min_product[0].split('?')[0]}"
+    if min_product:
+        # селектор для ссылки на товар
+        link = f"{url}{min_product[0].split('?')[0]}"
 
     return title, min_price, link
 
@@ -150,6 +154,7 @@ async def get_yandex_data(driver: WebDriver, url: str, keyword: str) -> Tuple:
     keyword = await keyword_check(keyword)
     # Перейти на сайт и выполнить поиск
     driver.get(url)
+    driver.minimize_window()
     search_box = WebDriverWait(driver, WEB_DRIVER_WAIT_MAX_TIMEOUT).until(
         EC.presence_of_element_located((By.ID, 'header-search'))
     )
@@ -203,8 +208,9 @@ async def get_yandex_data(driver: WebDriver, url: str, keyword: str) -> Tuple:
             min_price = price
             min_product = product
 
-    title = min_product[1]
-    link = f"{url}{min_product[2].split('?')[0]}"
+    if min_product:
+        title = min_product[1]
+        link = f"{url}{min_product[2].split('?')[0]}"
 
     return title, min_price, link
 
@@ -225,8 +231,11 @@ async def find_min_price_products(data: Dict) -> Dict:
 
 async def check_prices() -> Dict:
     result = {}
-
     tasks = []
+    title = None
+    price = None
+    link = None
+
     for site, url in URLS.items():
         for keyword in KEY_WORDS:
             # Создаем новый удаленный драйвер для каждой задачи
@@ -242,7 +251,11 @@ async def check_prices() -> Dict:
 
     # Преобразуем результаты в нужный словарь
     for i, (site, keyword) in enumerate(URLS.keys() * len(KEY_WORDS)):
-        title, price, link = results[i]
+        try:
+            title, price, link = results[i]
+        except AttributeError:
+            print(f"Ошибка: не удалось получить данные для {keyword} на {site.title()}.")
+
         result[f"{site}-{keyword}"] = {'title': title, 'price': price, 'link': link}
 
     return await find_min_price_products(result)
